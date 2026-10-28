@@ -14,7 +14,7 @@
     "fflate": "0.7.5",
     "mysql2": "^3.24.6",
     "next": "16.4.3",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "react-dom": "19.3.0",
     "read-excel-file": "^5.8.8",
     "server-only": "^0.0.1",
