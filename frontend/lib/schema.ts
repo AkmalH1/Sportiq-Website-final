@@ -1,0 +1,292 @@
+/**
+ * Database schema for MySQL 8 / MariaDB 10.6+ (InnoDB, utf8mb4).
+ * All times are stored in UTC. Money is whole LKR in INT columns.
+ * Changes after launch must be added as NEW entries in lib/migrations.ts, never by editing an old one.
+ */
+export const SCHEMA: string[] = [
+  `CREATE TABLE settings (
+    \`key\` VARCHAR(64) NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ('')
+  )`,
+  `CREATE TABLE sports (
+    slug VARCHAR(40) NOT NULL PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    tagline VARCHAR(200) NOT NULL DEFAULT '',
+    accent VARCHAR(9) NOT NULL DEFAULT '#111111',
+    sort INT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1,
+    size_set VARCHAR(20) NOT NULL DEFAULT 'apparel',
+    size_chart TEXT NOT NULL DEFAULT ('')
+  )`,
+  `CREATE TABLE subcategories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sport_slug VARCHAR(40) NOT NULL,
+    slug VARCHAR(40) NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    sort INT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1,
+    size_chart TEXT NOT NULL DEFAULT (''),
+    UNIQUE KEY sub_unique (sport_slug, slug),
+    CONSTRAINT fk_sub_sport FOREIGN KEY (sport_slug) REFERENCES sports(slug) ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE TABLE collections (
+    slug VARCHAR(40) NOT NULL PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    blurb VARCHAR(200) NOT NULL DEFAULT '',
+    from_color VARCHAR(9) NOT NULL DEFAULT '#111111',
+    to_color VARCHAR(9) NOT NULL DEFAULT '#f4720a',
+    match_type VARCHAR(60) NOT NULL DEFAULT '',
+    sort INT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1
+  )`,
+  `CREATE TABLE faqs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question VARCHAR(300) NOT NULL,
+    answer TEXT NOT NULL DEFAULT (''),
+    sort INT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1
+  )`,
+  `CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    slug VARCHAR(120) NOT NULL UNIQUE,
+    name VARCHAR(200) NOT NULL,
+    sport_slug VARCHAR(40) NOT NULL,
+    subcategory_slug VARCHAR(40) NOT NULL DEFAULT '',
+    league_slug VARCHAR(40) NOT NULL DEFAULT '',
+    type VARCHAR(80) NOT NULL DEFAULT '',
+    version VARCHAR(80) NOT NULL DEFAULT '',
+    price_lkr INT NOT NULL,
+    description TEXT NOT NULL DEFAULT (''),
+    status VARCHAR(12) NOT NULL DEFAULT 'published',
+    preorder_enabled TINYINT NOT NULL DEFAULT 0,
+    preorder_eta VARCHAR(80) NOT NULL DEFAULT '',
+    image_url VARCHAR(500) NOT NULL DEFAULT '',
+    gallery TEXT NOT NULL DEFAULT ('[]'),
+    customizable TINYINT NOT NULL DEFAULT 0,
+    weight_g INT NOT NULL DEFAULT 400,
+    is_demo TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_price CHECK (price_lkr >= 0),
+    CONSTRAINT chk_status CHECK (status IN ('published','draft','archived')),
+    KEY products_sport (sport_slug, status)
+  )`,
+  `CREATE TABLE variants (
+    sku VARCHAR(64) NOT NULL PRIMARY KEY,
+    product_id INT NOT NULL,
+    size VARCHAR(20) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    UNIQUE KEY variant_unique (product_id, size),
+    CONSTRAINT chk_stock CHECK (stock >= 0),
+    CONSTRAINT fk_variant_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE inventory_movements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sku VARCHAR(64) NOT NULL,
+    delta INT NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    order_id INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY movement_sku (sku)
+  )`,
+  `CREATE TABLE banners (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    \`position\` VARCHAR(10) NOT NULL,
+    sort INT NOT NULL DEFAULT 0,
+    eyebrow VARCHAR(120) NOT NULL DEFAULT '',
+    title VARCHAR(200) NOT NULL,
+    body TEXT NOT NULL DEFAULT (''),
+    cta_label VARCHAR(80) NOT NULL DEFAULT '',
+    cta_href VARCHAR(300) NOT NULL DEFAULT '/shop',
+    from_color VARCHAR(9) NOT NULL DEFAULT '#111111',
+    to_color VARCHAR(9) NOT NULL DEFAULT '#f4720a',
+    image_url VARCHAR(500) NOT NULL DEFAULT '',
+    active TINYINT NOT NULL DEFAULT 1,
+    CONSTRAINT chk_banner_pos CHECK (\`position\` IN ('hero','slider'))
+  )`,
+  `CREATE TABLE shipping_zones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    countries TEXT NOT NULL DEFAULT (''),
+    first_kg_lkr INT NOT NULL DEFAULT 0,
+    extra_kg_lkr INT NOT NULL DEFAULT 0,
+    days VARCHAR(80) NOT NULL DEFAULT '',
+    sort INT NOT NULL DEFAULT 0
+  )`,
+  `CREATE TABLE ems_rates (
+    country CHAR(2) NOT NULL PRIMARY KEY,
+    p250 INT NOT NULL DEFAULT 0,
+    p500 INT NOT NULL DEFAULT 0,
+    p1000 INT NOT NULL DEFAULT 0,
+    step500 INT NOT NULL DEFAULT 0,
+    max_kg INT NOT NULL DEFAULT 20,
+    note VARCHAR(200) NOT NULL DEFAULT ''
+  )`,
+  `CREATE TABLE dealers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    country VARCHAR(80) NOT NULL DEFAULT '',
+    whatsapp VARCHAR(40) NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT (''),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE batches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    dealer_id INT NULL,
+    stage VARCHAR(40) NOT NULL DEFAULT 'Confirmed',
+    eta VARCHAR(80) NOT NULL DEFAULT '',
+    payable INT NOT NULL DEFAULT 0,
+    paid INT NOT NULL DEFAULT 0,
+    notes TEXT NOT NULL DEFAULT (''),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_batch_dealer FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL
+  )`,
+  `CREATE TABLE orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    reference VARCHAR(20) NOT NULL UNIQUE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    customer_name VARCHAR(120) NOT NULL,
+    email VARCHAR(200) NOT NULL,
+    phone VARCHAR(40) NOT NULL,
+    address VARCHAR(300) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    country CHAR(2) NOT NULL DEFAULT 'LK',
+    postal_code VARCHAR(20) NOT NULL DEFAULT '',
+    delivery_method VARCHAR(20) NOT NULL DEFAULT 'delivery',
+    subtotal INT NOT NULL,
+    shipping INT NOT NULL DEFAULT 0,
+    total INT NOT NULL,
+    payment_method VARCHAR(10) NOT NULL,
+    payment_plan VARCHAR(10) NOT NULL DEFAULT 'full',
+    due_now INT NOT NULL,
+    paid_amount INT NOT NULL DEFAULT 0,
+    payment_status VARCHAR(12) NOT NULL DEFAULT 'pending',
+    stage VARCHAR(40) NOT NULL DEFAULT 'Awaiting payment',
+    has_preorder TINYINT NOT NULL DEFAULT 0,
+    credit_code VARCHAR(20) NOT NULL DEFAULT '',
+    credit_applied INT NOT NULL DEFAULT 0,
+    batch_id INT NULL,
+    admin_note TEXT NOT NULL DEFAULT (''),
+    CONSTRAINT chk_pay_method CHECK (payment_method IN ('payhere','bank')),
+    CONSTRAINT chk_pay_plan CHECK (payment_plan IN ('full','half')),
+    KEY orders_email (email),
+    KEY orders_stage (stage, payment_status, created_at),
+    KEY orders_batch (batch_id)
+  )`,
+  `CREATE TABLE order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    sku VARCHAR(64) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    size VARCHAR(20) NOT NULL,
+    qty INT NOT NULL,
+    unit_price INT NOT NULL,
+    addon_price INT NOT NULL DEFAULT 0,
+    options TEXT NOT NULL DEFAULT ('{}'),
+    source VARCHAR(10) NOT NULL,
+    CONSTRAINT chk_qty CHECK (qty > 0),
+    CONSTRAINT chk_source CHECK (source IN ('ready','preorder')),
+    CONSTRAINT fk_item_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    provider VARCHAR(20) NOT NULL,
+    provider_order_id VARCHAR(80) NOT NULL UNIQUE,
+    provider_ref VARCHAR(100) NULL,
+    amount INT NOT NULL,
+    currency CHAR(3) NOT NULL DEFAULT 'LKR',
+    status VARCHAR(20) NOT NULL DEFAULT 'initiated',
+    note VARCHAR(500) NOT NULL DEFAULT '',
+    verified_by VARCHAR(60) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY payments_provider_ref (provider, provider_ref),
+    KEY payments_order (order_id),
+    CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE payment_events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    provider VARCHAR(20) NOT NULL,
+    provider_order_id VARCHAR(80) NULL,
+    payload TEXT NOT NULL DEFAULT (''),
+    outcome VARCHAR(120) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE order_events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    stage VARCHAR(80) NOT NULL,
+    note VARCHAR(600) NOT NULL DEFAULT '',
+    actor VARCHAR(60) NOT NULL DEFAULT 'system',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY events_order (order_id),
+    CONSTRAINT fk_event_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    actor VARCHAR(60) NOT NULL,
+    action VARCHAR(60) NOT NULL,
+    detail VARCHAR(500) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE expenses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(80) NOT NULL,
+    amount INT NOT NULL,
+    spent_on DATE NOT NULL DEFAULT (CURRENT_DATE),
+    batch_id INT NULL,
+    description VARCHAR(200) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_expense CHECK (amount >= 0),
+    CONSTRAINT fk_expense_batch FOREIGN KEY (batch_id) REFERENCES batches(id) ON DELETE SET NULL
+  )`,
+  `CREATE TABLE reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_slug VARCHAR(120) NOT NULL DEFAULT '',
+    name VARCHAR(80) NOT NULL,
+    rating INT NOT NULL,
+    body TEXT NOT NULL DEFAULT (''),
+    image_url VARCHAR(500) NOT NULL DEFAULT '',
+    status VARCHAR(10) NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_rating CHECK (rating BETWEEN 1 AND 5),
+    CONSTRAINT chk_review_status CHECK (status IN ('pending','approved','rejected')),
+    KEY reviews_status (status)
+  )`,
+  `CREATE TABLE exchange_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_reference VARCHAR(20) NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    contact VARCHAR(120) NOT NULL,
+    item VARCHAR(200) NOT NULL DEFAULT '',
+    reason TEXT NOT NULL DEFAULT (''),
+    image_url VARCHAR(500) NOT NULL DEFAULT '',
+    status VARCHAR(12) NOT NULL DEFAULT 'new',
+    admin_note TEXT NOT NULL DEFAULT (''),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_exchange_status CHECK (status IN ('new','approved','rejected','completed'))
+  )`,
+  `CREATE TABLE store_credits (
+    code VARCHAR(20) NOT NULL PRIMARY KEY,
+    email VARCHAR(200) NOT NULL DEFAULT '',
+    balance INT NOT NULL DEFAULT 0,
+    issued INT NOT NULL DEFAULT 0,
+    note VARCHAR(300) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_balance CHECK (balance >= 0)
+  )`,
+  `CREATE TABLE credit_ledger (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(20) NOT NULL,
+    delta INT NOT NULL,
+    order_reference VARCHAR(20) NOT NULL DEFAULT '',
+    note VARCHAR(300) NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE TABLE rate_hits (
+    k VARCHAR(120) NOT NULL,
+    at BIGINT NOT NULL,
+    KEY rate_key (k, at)
+  )`,
+];

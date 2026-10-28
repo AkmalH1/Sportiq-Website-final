@@ -1,0 +1,75 @@
+services:
+  db:                                # MySQL 8, data lives in the db-data volume (not reachable from the internet)
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: sportiq
+      MYSQL_USER: sportiq
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci", "--default-time-zone=+00:00"]
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]   # no password on the command line: ping needs none
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    # Only what the website needs. The database ROOT password and the backup passphrase are deliberately NOT passed in, so a
+    # compromised web app cannot read them. (Values come from .env on the server.)
+    environment:
+      DATABASE_URL: mysql://sportiq:${DB_PASSWORD}@db:3306/sportiq
+      NODE_ENV: production
+      SITE_URL: ${SITE_URL:-}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-}
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
+      ADMIN_TOTP_SECRET: ${ADMIN_TOTP_SECRET:-}
+      ADMIN_HOST: ${ADMIN_HOST:?Set ADMIN_HOST in .env, for example staff.sportiq.lk}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      SHIPPING_FEE_LKR: ${SHIPPING_FEE_LKR:-}
+      BANK_NAME: ${BANK_NAME:-}
+      BANK_BRANCH: ${BANK_BRANCH:-}
+      BANK_ACCOUNT_NAME: ${BANK_ACCOUNT_NAME:-}
+      BANK_ACCOUNT_NUMBER: ${BANK_ACCOUNT_NUMBER:-}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-}
+      PAYHERE_MODE: ${PAYHERE_MODE:-}
+      PAYHERE_APP_ID: ${PAYHERE_APP_ID:-}
+      PAYHERE_APP_SECRET: ${PAYHERE_APP_SECRET:-}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-}
+      DATABASE_SSL: ${DATABASE_SSL:-}
+      DATABASE_SSL_CA: ${DATABASE_SSL_CA:-}
+    volumes:
+      - sportiq-uploads:/app/data      # customer / product photos
+    expose: ["3000"]
+    init: true                       # clean signal handling: in-flight requests finish before a restart
+    stop_grace_period: 20s
+    security_opt: ["no-new-privileges:true"]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:                             # automatic HTTPS certificates
+    image: caddy:2
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    ports: ["80:80", "443:443"]
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ADMIN_HOST=${ADMIN_HOST:?Set ADMIN_HOST in .env, for example staff.sportiq.lk}
+      - ADMIN_ALLOWED_IPS=${ADMIN_ALLOWED_IPS:-0.0.0.0/0 ::/0}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [web]
+
+volumes:
+  db-data:
+  sportiq-uploads:
+  caddy-data:

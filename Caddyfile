@@ -1,0 +1,103 @@
+# SPORTIQ reverse proxy. Which hostname may reach which path is enforced TWICE: here (first line of defence) and in
+# frontend/proxy.ts (via lib/host-policy.ts, which also covers /api). Keep the two in step.
+#
+#   public host  ({$DOMAIN})     everything except /admin.  Request-body caps: /api/payhere/notify 16 KB, /api/upload 5 MB, everything else 8 MB.
+#   staff host   ({$ADMIN_HOST}) /admin, /uploads, /_next and /api/health ONLY (no customer upload, no payment callback). Body cap 26 MB:
+#                                 bulk import file (app limit 20 MB) + multi-photo requests (app limit 24 MB). Next.js server actions allow 25 MB.
+#   callback host (optional)     see the commented block at the bottom: gives PayHere its own hostname.
+#
+# The app only believes the visitor address / forwarded headers when this proxy proves itself with X-Proxy-Auth (PROXY_AUTH_SECRET).
+# Set the SAME random value (32+ characters) for the caddy and web containers. See DEPLOY.md "Trusted proxy".
+
+(sportiq_upstream) {
+	reverse_proxy web:3000 {
+		# header_up REPLACES whatever the visitor sent under these names.
+		header_up X-Proxy-Auth {$PROXY_AUTH_SECRET}
+		header_up X-Real-Client-IP {client_ip}
+	}
+}
+
+# Behind Cloudflare or another CDN: uncomment, and list the CDN's published address ranges (https://www.cloudflare.com/ips/).
+# {client_ip} (above) then becomes the real visitor address; without this block it is the connecting address, which is correct when there is no CDN.
+# {
+# 	servers {
+# 		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 ...
+# 		client_ip_headers CF-Connecting-IP
+# 	}
+# }
+
+# Public shop
+{$DOMAIN} {
+	encode gzip zstd
+	# Defence in depth: the staff area never answers on the public address
+	@staff path /admin /admin/*
+	handle @staff {
+		respond 404
+	}
+	@notify path /api/payhere/notify
+	handle @notify {
+		request_body {
+			max_size 16KB
+		}
+		import sportiq_upstream
+	}
+	@upload path /api/upload
+	handle @upload {
+		request_body {
+			max_size 5MB
+		}
+		import sportiq_upstream
+	}
+	handle {
+		request_body {
+			max_size 8MB
+		}
+		import sportiq_upstream
+	}
+}
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# Staff area, its own address (for example staff.sportiq.lk), same server and same database
+{$ADMIN_HOST} {
+	encode gzip zstd
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		Cache-Control "no-store"
+	}
+	# Optional: only allow your shop and home addresses. Leave ADMIN_ALLOWED_IPS empty to allow everyone (password + 2FA still apply).
+	@denied not remote_ip {$ADMIN_ALLOWED_IPS:0.0.0.0/0 ::/0}
+	handle @denied {
+		respond 403
+	}
+	# The customer upload and the PayHere callback do not exist on the staff address (only the health check does).
+	@api {
+		path /api/*
+		not path /api/health
+	}
+	handle @api {
+		respond 404
+	}
+	handle {
+		request_body {
+			max_size 26MB
+		}
+		import sportiq_upstream
+	}
+}
+
+# OPTIONAL separate hostname for the PayHere callback (then set PAYHERE_NOTIFY_HOST=pay-callback.example.lk for the web container too:
+# checkout sends that address to PayHere, and the public host stops answering /api/payhere/notify). Only that path is reachable on it.
+# pay-callback.example.lk {
+# 	@notify path /api/payhere/notify /api/health
+# 	handle @notify {
+# 		request_body {
+# 			max_size 16KB
+# 		}
+# 		import sportiq_upstream
+# 	}
+# 	handle {
+# 		respond 404
+# 	}
+# }

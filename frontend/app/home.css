@@ -1,0 +1,76 @@
+/* Homepage sport tiles and campaign artwork. Original line illustrations, drawn with these classes. */
+.art svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.art-l { stroke: rgba(255, 255, 255, 0.4); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.art-d { stroke: rgba(255, 255, 255, 0.18); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.art-a { stroke: var(--color-accent); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.art-fa { fill: var(--color-accent); stroke: none; }
+.art-fi { fill: #111; stroke: rgba(255, 255, 255, 0.85); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.art-fw { fill: rgba(255, 255, 255, 0.85); stroke: none; }
+
+.sport-tile {
+  position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: space-between;
+  aspect-ratio: 3 / 4; overflow: hidden; padding: 1.25rem; container-type: inline-size; color: #fff; background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.sport-tile::before { /* soft spotlight so the artwork sits on a lifted surface */
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background: radial-gradient(120% 70% at 50% 28%, #262626 0%, #111 70%);
+}
+.sport-tile::after { /* accent rule that grows on hover */
+  content: ""; position: absolute; left: 0; bottom: 0; height: 3px; width: 2.5rem; background: var(--color-accent);
+  transition: width 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.sport-tile .art { position: absolute; inset: 2.25rem 0.75rem auto; height: 52%; z-index: -1;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent 98%); mask-image: linear-gradient(#000 70%, transparent 98%); transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.sport-tile:hover, .sport-tile:focus-visible { border-color: rgba(244, 114, 10, 0.7); }
+.sport-tile:hover::after, .sport-tile:focus-visible::after { width: 100%; }
+.sport-tile:hover .art, .sport-tile:focus-visible .art { transform: scale(1.05) translateY(-2px); }
+.sport-tile .tile-cta { display: inline-flex; align-items: center; gap: 0.5rem; transition: gap 0.25s; }
+.sport-tile:hover .tile-cta { gap: 0.9rem; }
+
+.sport-tile .tile-name { font-size: clamp(1.3rem, 13cqi, 3rem); overflow-wrap: break-word; hyphens: manual; }
+.sport-tile-all { aspect-ratio: 3 / 4; }
+
+/* Campaign artwork sits to the right on wide screens and behind the copy on phones */
+.campaign-art { position: absolute; top: 0; height: 60%; right: 0; width: 100%; opacity: 0.55; pointer-events: none; }
+@media (min-width: 768px) { .campaign-art { height: auto; bottom: 0; width: 52%; opacity: 0.9; padding: 2.5rem 3rem 5rem 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sport-tile, .sport-tile::after, .sport-tile .art, .sport-tile .tile-cta { transition: none; }
+  .sport-tile:hover .art, .sport-tile:focus-visible .art { transform: none; }
+}
+
+/* Sport page header artwork (decorative, original line art) */
+.hero-art { display: none; width: 9rem; height: 9rem; flex: none; opacity: 0.9; }
+.hero-art svg { width: 100%; height: 100%; }
+@media (min-width: 640px) { .hero-art { display: block; width: 11rem; height: 11rem; } }
+@media (min-width: 1024px) { .hero-art { width: 14rem; height: 14rem; } }
+
+/* Hero copy rises in when the slide changes */
+@keyframes hero-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.hero-copy { animation: hero-in 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .hero-copy { animation: none; } }
+
+/* Gift card visual used on the home page band and the gift cards page */
+.gift-card-art {
+  position: relative; aspect-ratio: 1.6 / 1; overflow: hidden; padding: 1.5rem; color: #fff;
+  background: linear-gradient(135deg, #222 0%, #000 70%); border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(244, 114, 10, 0.15);
+  transform: rotate(-3deg); transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.gift-card-art:hover { transform: rotate(0deg) scale(1.02); }
+.gift-card-art::before { content: ""; position: absolute; right: -2.5rem; top: -2.5rem; width: 11rem; height: 11rem; border-radius: 9999px; border: 1px solid rgba(244, 114, 10, 0.6); }
+.gift-card-art::after { content: ""; position: absolute; right: -0.8rem; top: -0.8rem; width: 7rem; height: 7rem; border-radius: 9999px; border: 1px solid rgba(255, 255, 255, 0.12); }
+@media (prefers-reduced-motion: reduce) { .gift-card-art { transition: none; transform: none; } }
+
+/* Hero sizing lives in plain CSS so it never depends on generated utility classes */
+.hero-box { min-height: min(88vh, 820px); }
+.hero-inner { min-height: min(88vh, 820px); }
+.hero-title { font-size: clamp(3.8rem, 14vw, 10.5rem); line-height: 0.88; letter-spacing: 0.01em; filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.45)); }
+.hero-title span { background: linear-gradient(100deg, #ffb26b, var(--color-accent) 55%, #ff5a00); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero-scene { position: absolute; display: none; right: 3%; bottom: 0; width: 44%; height: 82%; }
+.hero-glow { position: absolute; display: none; right: 6%; bottom: 8%; width: 40vw; height: 40vw; max-width: 640px; max-height: 640px; border-radius: 9999px;
+  background: radial-gradient(circle, rgba(244, 114, 10, 0.45), rgba(244, 114, 10, 0) 65%); filter: blur(10px); }
+@media (min-width: 768px) { .hero-scene, .hero-glow { display: block; } }
+.hero-copy .eyebrow { backdrop-filter: blur(4px); }

@@ -1,0 +1,37 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env: { MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: sportiq }
+        ports: ["3306:3306"]
+        options: --health-cmd="mysqladmin ping -uroot -proot" --health-interval=5s --health-timeout=5s --health-retries=20
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: node --experimental-strip-types --test tests/unit/*.test.ts
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+      - name: End-to-end tests
+        run: |
+          pip install playwright && playwright install --with-deps chromium
+          export DATABASE_URL=mysql://root:root@127.0.0.1:3306/sportiq SEED_DEMO_DATA=true ADMIN_PASSWORD_HASH=$(node scripts/hash-password.mjs test-password-12345) ADMIN_MFA_OPTIONAL=true SESSION_SECRET=testsecret1234567890-abcdefghijkl BANK_NAME=TestBank BANK_ACCOUNT_NAME=SPORTIQ BANK_ACCOUNT_NUMBER=123456
+          npx next start -p 3077 & sleep 8
+          for t in e2e2 e2e3 e2e4; do python3 tests/e2e/$t.py | tee /tmp/$t.log; ! grep -q "^FAIL" /tmp/$t.log; done
+
+  image-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t sportiq-web ./frontend
+      - name: Scan the image for known vulnerabilities (fails on HIGH/CRITICAL that have a fix)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: { image-ref: sportiq-web, severity: "HIGH,CRITICAL", ignore-unfixed: true, exit-code: "1" }

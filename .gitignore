@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+backend/vendor/
+backend/storage/*.key
+*.log
+
+.backup.env
+backups/

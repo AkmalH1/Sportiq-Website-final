@@ -1,0 +1,21 @@
+SPORTIQ - how to run (Windows)
+
+1. Unzip this folder (right-click the zip > Extract All).
+2. Double-click  START-SPORTIQ.bat
+   - First time only: if it says Node.js is missing, install the "LTS" version from the page it opens, then double-click again.
+   - The store needs a MySQL database. If you have Docker Desktop installed, the script starts one for you.
+     Otherwise install MySQL (or XAMPP), create a database called sportiq with user sportiq / password sportiq.
+   - The first start installs things and takes 1 to 3 minutes.
+NO DOCKER? EASIEST WAY (Windows):
+   a. Install XAMPP (free): https://www.apachefriends.org  (only Apache is not needed; MySQL is).
+   b. Open the XAMPP Control Panel and click START next to MySQL (it turns green).
+   c. Double-click SETUP-DATABASE-XAMPP.bat (one time only).
+   d. Double-click START-SPORTIQ.bat.
+   Each time later: start MySQL in XAMPP first, then START-SPORTIQ.bat.
+
+3. Your browser opens the store. Admin (ON THIS COMPUTER ONLY): http://localhost:3000/admin/login  password: sportiq-admin
+   This test password only works while the site address is localhost. NEVER put this version on the internet: follow DEPLOY.md,
+   which uses a hashed password and two-factor codes instead.
+
+Mac: double-click start.command (or run: bash start.sh).
+To stop: close the black window.
